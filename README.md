@@ -1,101 +1,95 @@
-# Kubeflow Pipelines
+# Pipelines
 
-[![SDK Documentation Status](https://readthedocs.org/projects/kubeflow-pipelines/badge/?version=latest)](https://kubeflow-pipelines.readthedocs.io/en/stable/?badge=latest)
-[![SDK Package version](https://img.shields.io/pypi/v/kfp?color=%2334D058&label=pypi%20package)](https://pypi.org/project/kfp)
-[![SDK Supported Python versions](https://img.shields.io/pypi/pyversions/kfp.svg?color=%2334D058)](https://pypi.org/project/kfp)
-[![OpenSSF Best Practices](https://www.bestpractices.dev/projects/9938/badge)](https://www.bestpractices.dev/projects/9938)
-[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/kubeflow/pipelines)
+The shipped visual ML pipeline DAG UI (React frontend) plus reference backend.
 
-## Overview of the Kubeflow pipelines service
+A brand-neutral fork in the [hanzo-ml](https://github.com/hanzo-ml)
+organization — the open-source ML lifecycle estate. Branding is
+consumed at runtime from a brand package via the
+[`@<org>/brand`](#brand-package) contract; the same code deploys under
+any white-label brand with zero source changes.
 
-[Kubeflow](https://www.kubeflow.org/) is a machine learning (ML) toolkit that is dedicated to making deployments of ML workflows on Kubernetes simple, portable, and scalable.
+## Brand package
 
-**Kubeflow pipelines** are reusable end-to-end ML workflows built using the Kubeflow Pipelines SDK.
+This fork imports brand configuration from a runtime brand package
+following the contract used across the open-source ML estate. Set
+`BRAND_PACKAGE` to the npm package name; the fork's frontend (where
+applicable) calls `loadBrand()` at boot to hydrate the singleton from
+that package's `brand.json`.
 
-The Kubeflow pipelines service has the following goals:
+Available brand packages:
 
-* End to end orchestration: enabling and simplifying the orchestration of end to end machine learning pipelines
-* Easy experimentation: making it easy for you to try numerous ideas and techniques, and manage your various trials/experiments.
-* Easy re-use: enabling you to re-use components and pipelines to quickly cobble together end to end solutions, without having to re-build each time.
+| Package | Brand |
+|---|---|
+| `@hanzo/brand` | default / Hanzo AI |
+| `@luxfi/brand` | Lux Finance |
+| `@zooai/brand` | Zoo Labs |
+| `@osage/brand` | Osage |
+| `@parsdao/brand` | Pars DAO |
+| `@cyrusdao/brand` | Cyrus DAO |
+| `@onyx-plus/brand` | Onyx Plus |
+| `@migaprotocol/brand` | Miga Protocol |
+| `@vccross/brand` | VC Cross |
+| `@mlc/brand` | MLC |
+| `@zenlm/brand` | Zen LM |
 
-## Installation
+Or any custom reseller package conforming to the same schema.
 
-* Kubeflow Pipelines can be installed as part of the [Kubeflow Platform](https://www.kubeflow.org/docs/started/installing-kubeflow/#kubeflow-platform). Alternatively you can deploy [Kubeflow Pipelines](https://www.kubeflow.org/docs/components/pipelines/operator-guides/installation/) as a standalone service.
+## Multi-tenant via IAM
 
-* The Docker container runtime has been deprecated on Kubernetes 1.20+. Kubeflow Pipelines has switched to use [Emissary Executor](https://www.kubeflow.org/docs/components/pipelines/legacy-v1/installation/choose-executor/#emissary-executor) by default from Kubeflow Pipelines 1.8. Emissary executor is Container runtime agnostic, meaning you are able to run Kubeflow Pipelines on Kubernetes cluster with any [Container runtimes](https://kubernetes.io/docs/setup/production-environment/container-runtimes/).
+Every request carries a JWT. The brand package's `iam` block specifies:
 
-### Dependencies Compatibility Matrix
+- `issuer` — JWT issuer URL
+- `jwksUrl` — JWKS endpoint
+- `tenantClaim` — JWT claim with the org/tenant ID (default `org_id`)
+- `tenantHeader` — HTTP header that propagates the validated tenant
+  ID (default `X-Org-Id`)
 
-| Dependency     | Versions         |
-| -------------- |------------------|
-| Argo Workflows | v3.5, v3.7, v4.0 |
-| MySQL          | v8               |
+The tenant ID scopes all storage, queries, and resource ownership.
+Cross-tenant access is forbidden by default.
 
-## Documentation
-
-Get started with your first pipeline and read further information in the [Kubeflow Pipelines overview](https://www.kubeflow.org/docs/components/pipelines/overview/).
-
-See the various ways you can [use the Kubeflow Pipelines SDK](https://kubeflow-pipelines.readthedocs.io/en/stable/).
-
-See the Kubeflow [Pipelines API doc](https://www.kubeflow.org/docs/components/pipelines/reference/api/kubeflow-pipeline-api-spec/) for API specification.
-
-Consult the [Python SDK reference docs](https://kubeflow-pipelines.readthedocs.io/en/stable/) when writing pipelines using the Python SDK.
-
-## Deep Wiki
-Check out our AI Powered repo documentation on [DeepWiki](https://deepwiki.com/kubeflow/pipelines). 
-
-> :warning: Please note, this is AI generated and may not have completely accurate information.
-
-## Contributing to Kubeflow Pipelines
-
-Before you start contributing to Kubeflow Pipelines, read the guidelines in [How to Contribute](./CONTRIBUTING.md). To learn how to build and deploy Kubeflow Pipelines from source code, read the [developer guide](./developer_guide.md).
-
-### Optional `just` command runner
-
-For local developer convenience, this repository includes an optional [just](https://github.com/casey/just) command runner at the repo root. It provides short aliases for existing `make` targets and does not replace any CI or release workflows.
-
-To use it, install `just` and run, for example:
+## Quick start (reseller deployment)
 
 ```bash
-just           # list available recipes
-just backend-test
-just backend-images
+export BRAND_PACKAGE="@<your-org>/brand"   # e.g. @luxfi/brand
 ```
 
-Notes:
+The frontend (this fork's case: `pipelines` ships the React DAG UI;
+the other 7 are read-only reference forks) loads the brand at boot.
+The backend reads the brand package's `iam` block for JWKS + tenant
+configuration.
 
-* All `just` recipes are thin wrappers around existing `make` targets (for example, `make -C backend/src/v2 test`).
-* There is intentionally no generic `just build` or `just test` recipe; heavy or Docker-building flows are exposed only via explicitly named recipes such as `backend-images`.
+## Role
 
-## Kubeflow Pipelines Community
+Frontend ships; backend is replaced by the Rust operator's `Pipeline` CRD reconciler. DAG runner is the lifecycle estate's durable-queue subsystem (HIP-0108).
 
-### Community Meeting
+The canonical control plane for the ML lifecycle estate is the Rust
+operator at [`hanzoai/operator`](https://github.com/hanzoai/operator).
+See [HIP-0109](https://github.com/hanzoai/HIPs/blob/main/HIPs/hip-0109-hanzo-ml-cloud-toolkit.md)
+for the lifecycle CRD set.
 
-The Kubeflow Pipelines Community Meeting occurs every other Wed 10-11AM (PST).
+## Upstream sync
 
-[Calendar Invite](https://calendar.google.com/event?action=TEMPLATE&tmeid=NTdoNG5uMDBtcnJlYmdlOWt1c2lkY25jdmlfMjAxOTExMTNUMTgwMDAwWiBqZXNzaWV6aHVAZ29vZ2xlLmNvbQ&tmsrc=jessiezhu%40google.com&scp=ALL)
+This fork stays current with upstream via the GitHub merge-upstream
+API. No upstream code is modified in this fork; only the 5 markdown
+files at root are added.
 
-[Direct Meeting Link](https://zoom.us/j/92607298595?pwd%3DVlKLUbiguGkbT9oKbaoDmCxrhbRop7.1&sa=D&source=calendar&ust=1736264977415448&usg=AOvVaw1EIkjFsKy0d4yQPptIJS3x)
+```bash
+gh api -X POST /repos/hanzo-ml/pipelines/merge-upstream \
+  -f branch=master
+```
 
-[Meeting notes](http://bit.ly/kfp-meeting-notes)
+See [UPSTREAM_README.md](./UPSTREAM_README.md) for the original
+project documentation.
 
-### Slack
+## License
 
-We also have a slack channel (#kubeflow-pipelines) on the Cloud Native Computing Foundation Slack workspace. You can find more details at [https://www.kubeflow.org/docs/about/community/#kubeflow-slack-channels](https://www.kubeflow.org/docs/about/community/#kubeflow-slack-channels)
+Apache-2.0. See [NOTICE](./NOTICE) for attribution.
 
-## Architecture
+## See also
 
-Details about the KFP Architecture can be found at [Architecture.md](docs/sdk/Architecture.md)
-
-## Blog posts
-
-* [From Raw Data to Model Serving: A Blueprint for the AI/ML Lifecycle with Kubeflow](https://blog.kubeflow.org/fraud-detection-e2e/) (By [Helber Belmiro](https://github.com/hbelmiro))
-* [Getting started with Kubeflow Pipelines](https://cloud.google.com/blog/products/ai-machine-learning/getting-started-kubeflow-pipelines) (By Amy Unruh)
-* How to create and deploy a Kubeflow Machine Learning Pipeline (By Lak Lakshmanan)
-  * [Part 1: How to create and deploy a Kubeflow Machine Learning Pipeline](https://medium.com/data-science/how-to-create-and-deploy-a-kubeflow-machine-learning-pipeline-part-1-efea7a4b650f)
-  * [Part 2: How to deploy Jupyter notebooks as components of a Kubeflow ML pipeline](https://medium.com/data-science/how-to-deploy-jupyter-notebooks-as-components-of-a-kubeflow-ml-pipeline-part-2-b1df77f4e5b3)
-  * [Part 3: How to carry out CI/CD in Machine Learning (“MLOps”) using Kubeflow ML pipelines](https://medium.com/google-cloud/how-to-carry-out-ci-cd-in-machine-learning-mlops-using-kubeflow-ml-pipelines-part-3-bdaf68082112)
-
-## Acknowledgments
-
-Kubeflow pipelines uses [Argo Workflows](https://github.com/argoproj/argo-workflows) by default under the hood to orchestrate Kubernetes resources. The Argo community has been very supportive and we are very grateful.
+- [DESIGN.md](./DESIGN.md) — design system reference (mirrors the brand
+  package's design spec)
+- [BRAND.md](./BRAND.md) — brand package contract and reseller guide
+- [MULTI_TENANT.md](./MULTI_TENANT.md) — tenant isolation contract
+- [HANZO_CHANGES.md](./HANZO_CHANGES.md) — divergence from upstream
+- [HIP-0109 Hanzo ML Cloud Toolkit](https://github.com/hanzoai/HIPs/blob/main/HIPs/hip-0109-hanzo-ml-cloud-toolkit.md)
